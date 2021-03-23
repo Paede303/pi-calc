@@ -76,7 +76,7 @@
 	 // - log the occurance of any error in flash mem (inc counter)
 	 // - print a message
 
-	 software_reset();
+	 //software_reset();
  }
 
  //----------------------------------------------

@@ -29,15 +29,18 @@
 
 uint8_t sec=0;
 
-#define BIT_0 (1<<0)
-#define BIT_1 (1<<1)
+
+#define BIT_0 0
+#define Leibniz_PI_RDY 1
+
 
 extern void vApplicationIdleHook( void );
 //void vLedBlink(void *pvParameters);
-void TimerTask(void *pvParameters);
+void TimerTask2(void *pvParameters);
 void DisplayTask(void *pvParameters);
 void ButtonTask(void *pvParameters);
 void LeibnizTask(void *pvParameters);
+void GaussTask(void *pvParameters);
 
 //TaskHandle_t ledTask;
 TaskHandle_t buttonTask1;
@@ -45,7 +48,7 @@ TaskHandle_t buttonTask2;
 TaskHandle_t buttonTask3;
 TaskHandle_t buttonTask4;
 
-EventGroupHandle_t TimerEventGroup;
+EventGroupHandle_t TimerEventGroup = NULL;
 
 
 void vApplicationIdleHook( void )
@@ -77,10 +80,11 @@ int main(void)
 	vInitClock();
 	vInitDisplay();
 
-
-	xTaskCreate( TimerTask, (const char *) "TimeTask", configMINIMAL_STACK_SIZE+100, NULL, 2, NULL);
-	xTaskCreate( DisplayTask, (const char *) "Display", configMINIMAL_STACK_SIZE+100, NULL, 2, NULL);
-	xTaskCreate( LeibnizTask, (const char *) "Leibniz", configMINIMAL_STACK_SIZE+100, NULL, 2, NULL);
+	TimerEventGroup = xEventGroupCreate();
+	xTaskCreate( TimerTask2, (const char *) "ScheissTask", configMINIMAL_STACK_SIZE+150, NULL, 1, NULL);
+	xTaskCreate( DisplayTask, (const char *) "Display", configMINIMAL_STACK_SIZE+150, NULL, 2, NULL);
+	xTaskCreate( LeibnizTask, (const char *) "Leibniz", configMINIMAL_STACK_SIZE+150, NULL, 1, NULL);
+	xTaskCreate( GaussTask, (const char *) "Gauss", configMINIMAL_STACK_SIZE+150, NULL, 1, NULL);
 
 
 	vDisplayClear();
@@ -101,15 +105,13 @@ ISR(TCD0_OVF_vect)
 	xEventGroupSetBitsFromISR(TimerEventGroup,BIT_0,&xHigherPriorityTaskWoken );
 
 }
-void TimerTask(void *pvParameters)
-{
-	uint8_t zell_verdammt;
+void TimerTask2(void *pvParameters)
+{	
 	(void) pvParameters;
-	PORTF.DIRSET = PIN0_bm; /*LED1*/
-	PORTF.OUT = 0x01;
-	TimerEventGroup = xEventGroupCreate();
+	uint8_t zell_verdammt;
+	uint8_t display_aktualisieren;
 	initTimer();
-	for(;;) 
+	while(1) 
 	{
 		//xEventGroupWaitBits(
 		//TimerEventGroup,		/* The event group being tested. */
@@ -120,29 +122,31 @@ void TimerTask(void *pvParameters)
 		zell_verdammt++;
 		if(zell_verdammt == 50)			//10ms *100 -> 1s
 		{
-			//display_aktualisieren = 1;
+			display_aktualisieren = 1;
+			zell_verdammt =0;
 		}
-		else
-		{
-			//display_aktualisieren = 0;
-		}
+		vTaskDelay(1);
 	}
 }
 void DisplayTask(void *pvParameters)
 {
-//	xEventGroupWaitBits(
-//	TimerEventGroup,		/* The event group being tested. */
-//	BIT_1,					/* The bits within the event group to wait for. */
-//	pdTRUE,					/* BIT_0 should be cleared before returning. */
-//	pdTRUE,					/* Don't wait for both bits, either bit will do. */
-//	portMAX_DELAY);			/* Wait a maximum of 100ms for either bit to be set. */
+	/*while(TimerEventGroup == NULL) 
+	{
+		vTaskDelay(1);
+	}*/
+	//xEventGroupWaitBits(
+	//TimerEventGroup,		/* The event group being tested. */
+	//Leibniz_PI_RDY,					/* The bits within the event group to wait for. */
+	//pdTRUE,					/* BIT_0 should be cleared before returning. */
+	//pdTRUE,					/* Don't wait for both bits, either bit will do. */
+	//portMAX_DELAY);			/* Wait a maximum of 100ms for either bit to be set. */
 	while(1)
 	{
 		// 		uint32_t stack = get_mem_unused();
 		// 		uint32_t heap = xPortGetFreeHeapSize();
 		// 		uint32_t taskStack = uxTaskGetStackHighWaterMark(ledTask);
-		// 		vDisplayClear();
-		 		//vDisplayWriteStringAtPos(0,0,"Time: %d:%d:%d", hr,min,sec);
+		 		vDisplayClear();
+		 		vDisplayWriteStringAtPos(0,0,"Leibniz Pi: %f", 3.14159);
 		 		//vDisplayWriteStringAtPos(1,0,"Alarm: %d:%d:%d", hr_set,min_set,sec_set);
 		 		//vDisplayWriteStringAtPos(2,0,"TaskStack: %d", taskStack);
 		 		//vDisplayWriteStringAtPos(3,0,"FreeSpace: %d", stack+heap);
@@ -156,16 +160,48 @@ void LeibnizTask(void *pvparameters)
 	uint32_t genauigkeit = 10000000;
 	uint32_t i;
 	double pi;
+	while(TimerEventGroup == NULL) {
+		vTaskDelay(1);
+	}
 	
 	while(1)
 	{
 		for(i = 1; i <= genauigkeit; i++)
 		{	
-			zahl += pow(-1.0,i+1)/(2*i-1);			
+			zahl += pow(-1.0,i+1)/(2*i-1);
+			//pi = zahl*4;
+			if(zahl == 0.78539)
+			{
+				i = 10000000;
+				//float *pvparameters = pi;
+				xEventGroupSetBits(TimerEventGroup,Leibniz_PI_RDY);
+			}			
 		}
-		pi = zahl*4;
 		vDisplayClear();
 		vDisplayWriteStringAtPos(0,0,"Leibniz %f", pi);
 		vTaskDelay(1000);
+	}
+}
+void GaussTask(void *pvParameters)
+{
+	float a = 1;
+	float b = 1/sqrt(2);
+	float s = 0.5;
+	float pi;
+	float hilf;
+	float c;
+	uint8_t n;
+
+	while(1)
+	{
+		for(n = 1; n <= 3; n++)
+		{
+			hilf = a;
+			a = (a+b)/2;
+			b = sqrt(hilf*b);
+			c = pow(a,2)-pow(b,2);
+			s = s-pow(2,n)*c;
+			pi = (2*pow(a,2))/s;
+		}
 	}
 }
