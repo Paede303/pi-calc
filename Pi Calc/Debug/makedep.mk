@@ -2,6 +2,8 @@
 # Automatically-generated file. Do not edit or delete the file
 ################################################################################
 
+ButtonHandler.c
+
 driver\clksys_driver.c
 
 driver\pmic_driver.c

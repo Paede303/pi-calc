@@ -28,7 +28,7 @@ main.d main.o: .././main.c ../includes/avr_compiler.h \
  ../FreeRTOS/include/timers.h ../FreeRTOS/include/task.h \
  ../FreeRTOS/include/stack_macros.h ../includes/mem_check.h \
  ../includes/init.h ../includes/utils.h ../includes/errorHandler.h \
- ../includes/NHD0420Driver.h \
+ ../includes/NHD0420Driver.h ../includes/ButtonHandler.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\math.h
 
 ../includes/avr_compiler.h:
@@ -116,5 +116,7 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\
 ../includes/errorHandler.h:
 
 ../includes/NHD0420Driver.h:
+
+../includes/ButtonHandler.h:
 
 c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\avr8\avr8-gnu-toolchain\avr\include\math.h:
