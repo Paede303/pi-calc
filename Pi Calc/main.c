@@ -29,18 +29,27 @@
 #include <math.h>
 
 #define interuppt10ms 1<<0
-#define Algorithmus 1<<1
-#define Starten 1<<2
-#define Leibniz_PI_RDY 1<<3
-#define Gauss_PI_RDY 1<<4
-#define reset 1<<5
-#define Starten_Leibniz 1<<6
-#define Ready 1<<7
+#define ALGORITHMUS 1<<1
+#define STARTEN_GAUSS 1<<2
+#define LEIBNIZ_PI_RDY 1<<3
+#define GAUSS_PI_RDY 1<<4
+#define RESET 1<<5
+#define STARTEN_LEIBNIZ 1<<6
+#define READY 1<<7
+#define LEIBNIZ_CALC_RDY 1<<8
+#define STARTEN 1<<9
+#define READY_GAUSS 1<<10
+#define STOP_LEIBNIZ 1<<11
+#define STOP_GAUSS 1<<12
+#define GAUSS_CALC_RDY 1<<13
+
+
 
 typedef enum{
 Anzeige,
 Leibniz,
-Gauss
+Gauss,
+HALT_STOP
 }Displaymodi_t;
 
 typedef enum{
@@ -157,19 +166,20 @@ void DisplayTask(void *pvParameters)
 		updateButtons();
 		if(getButtonPress(BUTTON1) == SHORT_PRESSED)
 		{
-			xEventGroupSetBits(TimerEventGroup,Starten);
+			xEventGroupSetBits(TimerEventGroup,STARTEN);
 		}
 		if(getButtonPress(BUTTON2) == SHORT_PRESSED)
 		{
 			xEventGroupSetBits(TimerEventGroup,Stop);
+			xEventGroupClearBits(TimerEventGroup,STARTEN);
 		}
 		if(getButtonPress(BUTTON3) == SHORT_PRESSED)
 		{
-			xEventGroupSetBits(TimerEventGroup,reset);
+			xEventGroupSetBits(TimerEventGroup,RESET);
 		}
 		if(getButtonPress(BUTTON4) == SHORT_PRESSED)
 		{
-			xEventGroupSetBits(TimerEventGroup,Algorithmus);
+			xEventGroupSetBits(TimerEventGroup,ALGORITHMUS);
 		}
 		switch(Displaymode)
 		{
@@ -179,18 +189,10 @@ void DisplayTask(void *pvParameters)
 		 			vDisplayWriteStringAtPos(1,0,"Gauss Pi: %f");
 					 
 
-				if(buttonstate & Algorithmus)
+				if(buttonstate & ALGORITHMUS)
 				{
-					modecount++;
-					if(modecount == 1)
-					{
-					Displaymode = Leibniz;					
-					}
-					else
-					{
-					Displaymode = Gauss;
-					modecount = 0;
-					}
+					Displaymode = Leibniz;
+					xEventGroupClearBits(TimerEventGroup,ALGORITHMUS);				
 				}
 				/*if(buttonstate & Stop)
 				{
@@ -200,37 +202,60 @@ void DisplayTask(void *pvParameters)
 			
 			case Leibniz:
 		
-				if(buttonstate & Starten)
+				if(buttonstate & STARTEN)
 				{
-					//xEventGroupSetBits(TimerEventGroup,Leibniz_PI_RDY);
-					xEventGroupSetBits(TimerEventGroup,Ready);
-					xEventGroupWaitBits(TimerEventGroup,Leibniz_PI_RDY,pdTRUE,pdTRUE,portMAX_DELAY);
-					if(Leibniz_PI_RDY != 0)
+					xEventGroupSetBits(TimerEventGroup,STARTEN_LEIBNIZ);
+					xEventGroupSetBits(TimerEventGroup,READY);
+					xEventGroupWaitBits(TimerEventGroup,LEIBNIZ_CALC_RDY,pdFALSE,pdTRUE,portMAX_DELAY);
+					if(xEventGroupGetBits(TimerEventGroup)&LEIBNIZ_CALC_RDY !=0)
 					{
 						vDisplayClear();
-						vDisplayWriteStringAtPos(0,0,"Leibniz Pi: %f", pi_leibniz);
-						vDisplayWriteStringAtPos(1,0,"Leibniz Pi: %f", pi_Gauss);
+						vDisplayWriteStringAtPos(0,0,"Leibniz Pi:%f", pi_leibniz);
+						vDisplayWriteStringAtPos(1,0,"Gauss Pi:%f");
+						xEventGroupClearBits(TimerEventGroup,LEIBNIZ_CALC_RDY);
+						xEventGroupClearBits(TimerEventGroup,READY);
 					}
-					xEventGroupClearBits(TimerEventGroup,Leibniz_PI_RDY);
+
 				}
+				if(buttonstate & ALGORITHMUS)
+				{
+					Displaymode = Gauss;
+					xEventGroupClearBits(TimerEventGroup,ALGORITHMUS);
+				}
+				/*if(buttonstate & Stop)
+				{
+					Displaymode = HALT_STOP;
+				}*/
 			break;
 			
 			case Gauss:
-				if(buttonstate & Starten)
+				if(buttonstate & STARTEN)
 				{
-					//xEventGroupSetBits(TimerEventGroup,Gauss_PI_RDY);
-					xEventGroupSetBits(TimerEventGroup,Ready);
-					xEventGroupWaitBits(TimerEventGroup,Gauss_PI_RDY,pdTRUE,pdTRUE,portMAX_DELAY);
-					if(Gauss_PI_RDY != 0)
+					xEventGroupSetBits(TimerEventGroup,STARTEN_GAUSS);
+					xEventGroupSetBits(TimerEventGroup,READY_GAUSS);
+					xEventGroupWaitBits(TimerEventGroup,GAUSS_CALC_RDY,pdTRUE,pdTRUE,portMAX_DELAY);
+					if(xEventGroupGetBits(TimerEventGroup)&GAUSS_CALC_RDY !=0)
 					{
 						vDisplayClear();
-						vDisplayWriteStringAtPos(0,0,"Leibniz Pi: %f", pi_leibniz);
-						vDisplayWriteStringAtPos(1,0,"Leibniz Pi: %f", pi_Gauss);						
+						vDisplayWriteStringAtPos(0,0,"Leibniz Pi:%f");
+						vDisplayWriteStringAtPos(1,0,"Gauss Pi:%f",pi_Gauss);
+						xEventGroupClearBits(TimerEventGroup,GAUSS_CALC_RDY);						
 					}
-					xEventGroupClearBits(TimerEventGroup,Gauss_PI_RDY);
+				}
+				if(buttonstate&ALGORITHMUS)
+				{
+					Displaymode=Leibniz;
+					xEventGroupClearBits(TimerEventGroup,ALGORITHMUS);
 				}
 			break;
 				
+			/*case HALT_STOP:
+				xEventGroupSetBits(TimerEventGroup,STARTEN_LEIBNIZ|STOP_GAUSS);
+				if(buttonstate&STARTEN)
+				{
+					Displaymode = Anzeige;
+				}
+			break;
 				/*xEventGroupWaitBits(TimerEventGroup,Leibniz_PI_RDY,pdTRUE,pdFALSE,10);			
 				if(Leibniz_PI_RDY != 0)
 				{
@@ -263,38 +288,46 @@ void LeibnizTask(void *pvparameters)
 	
 	while(1)
 	{
-		//xEventGroupWaitBits(TimerEventGroup,Starten_Leibniz|reset,pdTRUE,pdTRUE,10);
-		//while(reset != reset)
-		//{
-			state = xEventGroupGetBits(TimerEventGroup);
-			switch(Picalc)
+
+		if(xEventGroupGetBits(TimerEventGroup)&STARTEN_LEIBNIZ)
+		{
+
+			for(i = 1; i <= genauigkeit; i++)
 			{
-				case Stop:
-					while(xEventGroupWaitBits(TimerEventGroup,Stop,pdTRUE,pdTRUE,portMAX_DELAY)!=0)
-					{
-						if(xEventGroupWaitBits(TimerEventGroup,Stop,pdTRUE,pdTRUE,portMAX_DELAY)==NULL)
-						{
-						}	
-					}
-				break;
-				
-				case Start:
-				if(xEventGroupWaitBits(TimerEventGroup,Starten,pdTRUE,pdTRUE,portMAX_DELAY)!=0)
+				zahl += pow(-1.0,i+1)/(2*i-1);
+				pi_leibniz = zahl*4;
+						
+				if(xEventGroupGetBits(TimerEventGroup)&READY)
 				{
-					for(i = 1; i <= genauigkeit; i++)
-					{
-						zahl += pow(-1.0,i+1)/(2*i-1);
-						pi_leibniz = zahl*4;
-						if(pi_leibniz == 3.1415)
-						{
-							i = 10000000;
-							xEventGroupSetBits(TimerEventGroup,Leibniz_PI_RDY);
-						}
-					}
+					//xEventGroupClearBits(TimerEventGroup,STARTEN_LEIBNIZ);
+					xEventGroupSetBits(TimerEventGroup,LEIBNIZ_CALC_RDY);
+					//xEventGroupWaitBits(TimerEventGroup,STARTEN_LEIBNIZ,pdFALSE,pdTRUE,portMAX_DELAY);
+					//xEventGroupClearBits(TimerEventGroup,READY);
 				}
-				break;	
+				else
+				{
+					xEventGroupClearBits(TimerEventGroup,LEIBNIZ_CALC_RDY);
+				}
+				if(xEventGroupGetBits(TimerEventGroup)&RESET)
+				{
+					zahl = 0;
+					i = genauigkeit;
+					pi_leibniz = 0;
+					xEventGroupClearBits(TimerEventGroup,RESET);
+				}				
+				if(pi_leibniz == 3.14159)
+				{
+					i = genauigkeit;
+					xEventGroupSetBits(TimerEventGroup,LEIBNIZ_PI_RDY);
+					pi_leibniz = 0;
+					zahl = 0;
+				}
+				else
+				{
+					xEventGroupClearBits(TimerEventGroup,LEIBNIZ_PI_RDY);
+				}
 			}
-		//}
+		}
 	}
 }
 
@@ -313,40 +346,54 @@ void GaussTask(void *pvParameters)
 	
 	while(1)
 	{
-		xEventGroupWaitBits(TimerEventGroup,Starten|reset,pdTRUE,pdTRUE,10);
-		//while(reset != reset)
-		//{
-			if(Starten)
+
+			if(xEventGroupGetBits(TimerEventGroup)&STARTEN_GAUSS)
 			{
-				if(xEventGroupWaitBits(TimerEventGroup,Stop,pdTRUE,pdTRUE,portMAX_DELAY)!=0)
+				for(n = 1; n <= 3; n++)
 				{
-					
-					for(n = 1; n <= 3; n++)
+					hilf = a;
+					a = (a+b)/2;
+					b = sqrt(hilf*b);
+					c = pow(a,2)-pow(b,2);
+					s = s-pow(2,n)*c;
+					pi_Gauss = (2*pow(a,2))/s;
+					if(xEventGroupGetBits(TimerEventGroup)&READY_GAUSS)
 					{
-						hilf = a;
-						a = (a+b)/2;
-						b = sqrt(hilf*b);
-						c = pow(a,2)-pow(b,2);
-						s = s-pow(2,n)*c;
-						pi_Gauss = (2*pow(a,2))/s;
-				
-						if(n == 3)
-						{
-							xEventGroupSetBits(TimerEventGroup,Gauss_PI_RDY);
-							pi_Gauss = 0;
-							a = 1;
-							b = 1/sqrt(2);
-							s = 0.5;
-							hilf = 0;
-							c = 0;
-						}
-						else
-						{
-							xEventGroupClearBits(TimerEventGroup,Gauss_PI_RDY);
-						}
+						//xEventGroupClearBits(TimerEventGroup,STARTEN_LEIBNIZ);
+						xEventGroupSetBits(TimerEventGroup,GAUSS_CALC_RDY);
+						//xEventGroupWaitBits(TimerEventGroup,STARTEN_LEIBNIZ,pdFALSE,pdTRUE,portMAX_DELAY);
+						//xEventGroupClearBits(TimerEventGroup,READY);
+					}
+					else
+					{
+						xEventGroupClearBits(TimerEventGroup,GAUSS_CALC_RDY);
+					}
+					if(xEventGroupGetBits(TimerEventGroup)&RESET)
+					{
+						a=1;
+						b=1/sqrt(2);
+						s=0.5;
+						hilf = 0;
+						c = 0;
+						pi_Gauss = 0;
+						xEventGroupClearBits(TimerEventGroup,RESET);
+					}
+					if(n == 3)
+					{
+						xEventGroupSetBits(TimerEventGroup,GAUSS_PI_RDY);
+						pi_Gauss = 0;
+						a = 1;
+						b = 1/sqrt(2);
+						s = 0.5;
+						hilf = 0;
+						c = 0;
+					}
+					else
+					{
+						xEventGroupClearBits(TimerEventGroup,GAUSS_PI_RDY);
 					}
 				}
 			}
-		//}
+
 	}
 }
