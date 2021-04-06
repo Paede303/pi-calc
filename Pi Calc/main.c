@@ -59,8 +59,13 @@ Fertig
 }Picalc_t;
 
 uint8_t display_aktualisieren;
+uint32_t TIME_Leibniz;
+uint32_t Zeit_Leibniz;
+uint32_t Zeit_Gauss;
+uint32_t TIME_Gauss;
 float pi_leibniz;
 float pi_Gauss;
+
 
 extern void vApplicationIdleHook( void );
 //void vLedBlink(void *pvParameters);
@@ -126,6 +131,7 @@ void TimerTask2(void *pvParameters)
 {	
 	(void) pvParameters;
 	uint8_t zell_verdammt;
+	uint8_t Zeit_Messung;
 
 	initTimer();
 	while(1) 
@@ -137,6 +143,7 @@ void TimerTask2(void *pvParameters)
 		pdTRUE,					/* Don't wait for both bits, either bit will do. */
 		portMAX_DELAY);			/* Wait a maximum of 100ms for either bit to be set. */
 		zell_verdammt++;
+		Zeit_Messung = 0;
 		if(zell_verdammt == 50)			//10ms *50 -> 500ms
 		{
 			display_aktualisieren = 1;
@@ -194,10 +201,6 @@ void DisplayTask(void *pvParameters)
 					Displaymode = Leibniz;
 					xEventGroupClearBits(TimerEventGroup,ALGORITHMUS);				
 				}
-				/*if(buttonstate & Stop)
-				{
-					xEventGroupSetBits(TimerEventGroup,Stop);
-				}*/
 			break;
 			
 			case Leibniz:
@@ -207,25 +210,29 @@ void DisplayTask(void *pvParameters)
 					xEventGroupSetBits(TimerEventGroup,STARTEN_LEIBNIZ);
 					xEventGroupSetBits(TimerEventGroup,READY);
 					xEventGroupWaitBits(TimerEventGroup,LEIBNIZ_CALC_RDY,pdFALSE,pdTRUE,portMAX_DELAY);
-					if(xEventGroupGetBits(TimerEventGroup)&LEIBNIZ_CALC_RDY !=0)
+					if(xEventGroupGetBits(TimerEventGroup)&LEIBNIZ_CALC_RDY!=0)
 					{
 						vDisplayClear();
 						vDisplayWriteStringAtPos(0,0,"Leibniz Pi:%f", pi_leibniz);
 						vDisplayWriteStringAtPos(1,0,"Gauss Pi:%f");
+						vDisplayWriteStringAtPos(2,0,"Zeit Leibniz:%dms",Zeit_Leibniz);
 						xEventGroupClearBits(TimerEventGroup,LEIBNIZ_CALC_RDY);
 						xEventGroupClearBits(TimerEventGroup,READY);
 					}
-
+					if(xEventGroupGetBits(TimerEventGroup)&LEIBNIZ_PI_RDY)
+					{
+						vDisplayClear();
+						vDisplayWriteStringAtPos(0,0,"Leibniz Pi:%f",pi_leibniz);
+						vDisplayWriteStringAtPos(1,0,"Gauss Pi:%f");
+						vDisplayWriteStringAtPos(2,0,"Zeit Leibniz:%dms",TIME_Leibniz);
+					}
 				}
 				if(buttonstate & ALGORITHMUS)
 				{
 					Displaymode = Gauss;
 					xEventGroupClearBits(TimerEventGroup,ALGORITHMUS);
 				}
-				/*if(buttonstate & Stop)
-				{
-					Displaymode = HALT_STOP;
-				}*/
+				
 			break;
 			
 			case Gauss:
@@ -234,12 +241,20 @@ void DisplayTask(void *pvParameters)
 					xEventGroupSetBits(TimerEventGroup,STARTEN_GAUSS);
 					xEventGroupSetBits(TimerEventGroup,READY_GAUSS);
 					xEventGroupWaitBits(TimerEventGroup,GAUSS_CALC_RDY,pdTRUE,pdTRUE,portMAX_DELAY);
-					if(xEventGroupGetBits(TimerEventGroup)&GAUSS_CALC_RDY !=0)
+					if(xEventGroupGetBits(TimerEventGroup)&GAUSS_CALC_RDY!=0)
 					{
 						vDisplayClear();
 						vDisplayWriteStringAtPos(0,0,"Leibniz Pi:%f");
 						vDisplayWriteStringAtPos(1,0,"Gauss Pi:%f",pi_Gauss);
+						vDisplayWriteStringAtPos(2,0,"Zeit Leibniz:%dms",Zeit_Gauss);
 						xEventGroupClearBits(TimerEventGroup,GAUSS_CALC_RDY);						
+					}
+					if(xEventGroupGetBits(TimerEventGroup)&GAUSS_PI_RDY)
+					{
+						vDisplayClear();
+						vDisplayWriteStringAtPos(0,0,"Leibniz Pi:%f");
+						vDisplayWriteStringAtPos(1,0,"Gauss Pi:%f",pi_Gauss);
+						vDisplayWriteStringAtPos(2,0,"Zeit Leibniz:%dms",TIME_Gauss);
 					}
 				}
 				if(buttonstate&ALGORITHMUS)
@@ -249,25 +264,8 @@ void DisplayTask(void *pvParameters)
 				}
 			break;
 				
-			/*case HALT_STOP:
-				xEventGroupSetBits(TimerEventGroup,STARTEN_LEIBNIZ|STOP_GAUSS);
-				if(buttonstate&STARTEN)
-				{
-					Displaymode = Anzeige;
-				}
-			break;
-				/*xEventGroupWaitBits(TimerEventGroup,Leibniz_PI_RDY,pdTRUE,pdFALSE,10);			
-				if(Leibniz_PI_RDY != 0)
-				{
-					vDisplayClear();
-		 			vDisplayWriteStringAtPos(0,0,"Leibniz Pi: %f", pi_leibniz);
-				}
-				xEventGroupWaitBits(TimerEventGroup,Gauss_PI_RDY,pdTRUE,pdTRUE,10);
-				if(Gauss_PI_RDY != 0)
-				{
-					vDisplayClear();
-		 			vDisplayWriteStringAtPos(1,0,"Gauss Pi: %f", pi_Gauss);
-				}*/
+
+
 		
 		}
 		vTaskDelay(100 / portTICK_RATE_MS);
@@ -279,8 +277,6 @@ void LeibnizTask(void *pvparameters)
 	double zahl=0;
 	uint32_t genauigkeit = 10000000;
 	uint32_t i;
-	uint16_t state;
-	static Picalc_t Picalc = Start;
 	while(TimerEventGroup == NULL) 
 	{
 		vTaskDelay(1);
@@ -291,42 +287,43 @@ void LeibnizTask(void *pvparameters)
 
 		if(xEventGroupGetBits(TimerEventGroup)&STARTEN_LEIBNIZ)
 		{
+			
 
-			for(i = 1; i <= genauigkeit; i++)
-			{
-				zahl += pow(-1.0,i+1)/(2*i-1);
-				pi_leibniz = zahl*4;
+				for(i = 1; i <= genauigkeit; i++)
+				{
+					Zeit_Leibniz++;
+					zahl += pow(-1.0,i+1)/(2*i-1);
+					pi_leibniz = zahl*4;
 						
-				if(xEventGroupGetBits(TimerEventGroup)&READY)
-				{
-					//xEventGroupClearBits(TimerEventGroup,STARTEN_LEIBNIZ);
-					xEventGroupSetBits(TimerEventGroup,LEIBNIZ_CALC_RDY);
-					//xEventGroupWaitBits(TimerEventGroup,STARTEN_LEIBNIZ,pdFALSE,pdTRUE,portMAX_DELAY);
-					//xEventGroupClearBits(TimerEventGroup,READY);
+					if(xEventGroupGetBits(TimerEventGroup)&READY)
+					{
+						//xEventGroupClearBits(TimerEventGroup,STARTEN_LEIBNIZ);
+						xEventGroupSetBits(TimerEventGroup,LEIBNIZ_CALC_RDY);
+						//xEventGroupWaitBits(TimerEventGroup,STARTEN_LEIBNIZ,pdFALSE,pdTRUE,portMAX_DELAY);
+						//xEventGroupClearBits(TimerEventGroup,READY);
+					}
+					else
+					{
+						xEventGroupClearBits(TimerEventGroup,LEIBNIZ_CALC_RDY);
+					}
+					if(xEventGroupGetBits(TimerEventGroup)&RESET)
+					{
+						zahl = 0;
+						i = genauigkeit;
+						pi_leibniz = 0;
+						xEventGroupClearBits(TimerEventGroup,RESET|STARTEN_LEIBNIZ);
+					}				
+					if(pi_leibniz == 3.14159)
+					{
+						TIME_Leibniz = Zeit_Leibniz;
+						xEventGroupSetBits(TimerEventGroup,LEIBNIZ_PI_RDY);
+					}
+					else
+					{
+						xEventGroupClearBits(TimerEventGroup,LEIBNIZ_PI_RDY);
+					}
 				}
-				else
-				{
-					xEventGroupClearBits(TimerEventGroup,LEIBNIZ_CALC_RDY);
-				}
-				if(xEventGroupGetBits(TimerEventGroup)&RESET)
-				{
-					zahl = 0;
-					i = genauigkeit;
-					pi_leibniz = 0;
-					xEventGroupClearBits(TimerEventGroup,RESET);
-				}				
-				if(pi_leibniz == 3.14159)
-				{
-					i = genauigkeit;
-					xEventGroupSetBits(TimerEventGroup,LEIBNIZ_PI_RDY);
-					pi_leibniz = 0;
-					zahl = 0;
-				}
-				else
-				{
-					xEventGroupClearBits(TimerEventGroup,LEIBNIZ_PI_RDY);
-				}
-			}
+			
 		}
 	}
 }
@@ -351,6 +348,7 @@ void GaussTask(void *pvParameters)
 			{
 				for(n = 1; n <= 3; n++)
 				{
+					Zeit_Gauss++;
 					hilf = a;
 					a = (a+b)/2;
 					b = sqrt(hilf*b);
@@ -370,23 +368,20 @@ void GaussTask(void *pvParameters)
 					}
 					if(xEventGroupGetBits(TimerEventGroup)&RESET)
 					{
-						a=1;
-						b=1/sqrt(2);
-						s=0.5;
-						hilf = 0;
-						c = 0;
-						pi_Gauss = 0;
-						xEventGroupClearBits(TimerEventGroup,RESET);
-					}
-					if(n == 3)
-					{
-						xEventGroupSetBits(TimerEventGroup,GAUSS_PI_RDY);
-						pi_Gauss = 0;
+						n = 4;
 						a = 1;
 						b = 1/sqrt(2);
 						s = 0.5;
-						hilf = 0;
 						c = 0;
+						hilf = 0;
+						pi_Gauss = 0;
+						xEventGroupClearBits(TimerEventGroup,RESET|STARTEN_GAUSS);
+					}
+					if(n == 3)
+					{
+						TIME_Gauss = Zeit_Gauss;
+						xEventGroupSetBits(TimerEventGroup,GAUSS_PI_RDY);
+
 					}
 					else
 					{
